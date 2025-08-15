@@ -1,10 +1,12 @@
 import pyfiglet
 import subprocess
 import json
+import boto3
 import sys
 import time
 import os
 import threading
+from botocore.exceptions import ClientError
 
 
 # Usage: python3 epicShelter.py [OPERATION] 
@@ -12,7 +14,8 @@ import threading
 
 CREATE_OPERATION = 'create'
 DESTROY_OPERATION = 'destroy'
-allowedOperations = [CREATE_OPERATION, DESTROY_OPERATION]
+GET_API_URL = 'getUrl'
+allowedOperations = [CREATE_OPERATION, DESTROY_OPERATION, GET_API_URL]
 def printBanner(banner:str):
     print("printing banner")
 
@@ -34,6 +37,14 @@ def validateArgs(args):
             print("Invalid operation: Valid operations are create and destroy")
     return False
 
+
+def handleOperation(operationName:str, response:subprocess.CompletedProcess):
+    if response.returncode == 0:
+        print(f"Operation  {operationName} successfull")
+    else:
+        print(f"An unexpected AWS error occurred: {response.stderr}")
+        sys.exit()
+
 def createSecret():
     #aws secretsmanager create-secret  --name AuthSecret --description SecretValue --secret-string file://secret.json
     createSecretResponse = subprocess.run(
@@ -42,7 +53,7 @@ def createSecret():
             "secretsmanager",
             "create-secret",
             "--name",
-            "TestSecret2",
+            "AuthSecret",
             "--description",
             "SecretValue",
             "--secret-string",
@@ -50,21 +61,46 @@ def createSecret():
         ],
         capture_output=True,
     )
-    createSecretResponseJson = json.loads(createSecretResponse.stdout.decode("utf-8"))
-    print(createSecretResponseJson)
+    handleOperation(operationName='Create Secret',response=createSecretResponse)
 
-    getSecretResponse = subprocess.run(
-        [
-            "aws",
-            "secretsmanager",
-            "get-secret-value",
-            "--secret-id",
-            "TestSecret2"
-        ],
-        capture_output=True,
-    )
-    getSecretResponseJson = json.loads(getSecretResponse.stdout.decode("utf-8"))
-    print(getSecretResponseJson)
+def getSecret(secretName:str):
+    '''
+    aws secretsmanager get-secret-value --secret-id TestSecret1
+    '''
+    try:
+        # getSecretResponse = subprocess.run(
+        #     [
+        #         "aws",
+        #         "secretsmanager",
+        #         "get-secret-value",
+        #         "--secret-id",
+        #         "TestSecret99"
+        #     ],
+        #     capture_output=True,
+        # )
+        # print(getSecretResponse)
+        # returnCode = getSecretResponse.returncode
+        # print(returnCode)
+        session = boto3.session.Session()
+        client = session.client(
+            service_name='secretsmanager',
+            region_name='us-east-1'
+        )
+        
+        get_secret_value_response = client.get_secret_value(
+            SecretId=secretName
+        )
+    except ClientError as e:
+        print('here !!!!!!!!!')
+        if e.response['Error']['Code'] == 'ResourceNotFoundException':
+            print('ResourceNotFoundException for secret ', secretName)
+            # Perform specific actions for a missing resource, e.g., create it
+        else:
+            print(f"An unexpected AWS error occurred: {e}")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+    # getSecretResponseJson = json.loads(getSecretResponse.stdout.decode("utf-8"))
+    # print(getSecretResponseJson)
 
 
 def deleteSecret():
@@ -74,12 +110,12 @@ def deleteSecret():
             "secretsmanager",
             "delete-secret",
             "--secret-id",
-            "TestSecret2"
+            "AuthSecret",
+            "--force-delete-without-recovery"
         ],
         capture_output=True,
     )
-    deleteSecretResponseJson = json.loads(deleteSecretResponse.stdout.decode("utf-8"))
-    print(deleteSecretResponseJson)
+    handleOperation(operationName='Delete Secret',response=deleteSecretResponse)
 
 def createStack():
     print("Creating cloudFormation stack !!!")
@@ -105,8 +141,7 @@ def createStack():
         ],
         capture_output=True,
     )
-    createStackResponseJson = json.loads(createStackResponse.stdout.decode("utf-8"))
-    print(createStackResponseJson)
+    handleOperation(operationName='Create Stack',response=createStackResponse)
 
 def destroyStack():
     '''
@@ -122,26 +157,24 @@ def destroyStack():
         ],
         capture_output=True,
     )
-    print(deleteStackResponse)
-    # deleteStackResponseJson = json.loads(deleteStackResponse.stdout.decode("utf-8"))
-    # print(deleteStackResponseJson)
+    handleOperation(operationName='Destroy Stack',response=deleteStackResponse)
 
 
 def deleteBucket():
     '''
-    aws s3api delete-bucket --bucket logs-bucket-test-1
+    aws s3 rb s3://your-bucket-name --force
     '''
     deleteBucketResponse = subprocess.run(
         [
             "aws",
-            "s3api",
-            "delete-bucket",
-            "--bucket",
-            "logs-bucket-test-1"
+            "s3",
+            "rb",
+            "s3://logs-bucket-test-1",
+            "--force"
         ],
         capture_output=True,
     )
-    print(deleteBucketResponse)
+    handleOperation(operationName='Delete Bucket',response=deleteBucketResponse)
 
 def createBucket():
     '''
@@ -157,8 +190,7 @@ def createBucket():
         ],
         capture_output=True,
     )
-    createBucketResponseJson = json.loads(createBucketResponse.stdout.decode("utf-8"))
-    print(createBucketResponseJson)
+    handleOperation(operationName='Create Bucket',response=createBucketResponse)
 
 
 def loadingAnimation(process) :
@@ -197,8 +229,11 @@ def getApiGateWayEndpoint():
         text=True
     )
     gateWayUrl = getApiGwEndpointResponse.stdout.removesuffix("\n")
-    invoke_url=gateWayUrl + "/" + stage_name
-    print(invoke_url)
+    if gateWayUrl == '':
+        print("Stack creation is still in progress , please execute the command after few seconds")
+    else:
+        invoke_url=gateWayUrl + "/" + stage_name
+        print("API gateway url that can be invoked : ",invoke_url)
 
 if __name__ == '__main__':
     printBanner(banner="Epic Shelter")
@@ -206,18 +241,20 @@ if __name__ == '__main__':
         operation = sys.argv[1]
         print(f"Performing operation: [{operation}]")
         if operation == CREATE_OPERATION:
-            # createSecret()
+            createSecret()
+            # getSecret(secretName="TestSecret99")
             createBucket()
-            # createStack()
+            createStack()
             # loading_process = threading.Thread(target=foo)
             # loading_process.start()
 
             # loadingAnimation(loading_process)
             # loading_process.join()
-            # getApiGateWayEndpoint()
+            print("Use operation getUrl  (` python3 epicShelter.py getUrl`) to get the api invocation url")
         elif operation == DESTROY_OPERATION:
-            #deleteSecret()
+            deleteSecret()
             deleteBucket()
-            #destroyStack()
-            pass
+            destroyStack()
+        elif operation == GET_API_URL:
+            getApiGateWayEndpoint()
 
