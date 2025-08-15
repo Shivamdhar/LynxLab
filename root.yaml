@@ -1,0 +1,364 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: API Gateway, Lambda Authorizer, Main Lambda Function interacting with Amazon Bedrock model
+
+Parameters:
+  AuthSecret: 
+    Type: String
+    Default: 'AuthSecret'
+  BedrockModelId:
+    Type: String
+    Default: 'amazon.titan-text-express-v1'
+  BucketName:
+    Type: String
+    Default: 'logs-bucket-test-1'
+
+Resources:
+#####################################
+# Authorizer Lambda Function
+#####################################
+  AuthorizationLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: AuthorizationLambdaFunction
+      Description: Lambda Authorizer for API Gateway
+      Runtime: python3.12
+      Handler: index.lambda_handler
+      Role: !GetAtt AuthorizationLambdaExecutionRole.Arn
+      Timeout: 10
+      MemorySize: 128
+      Environment:
+        Variables:
+          AuthSecret: !Ref AuthSecret
+      Code:
+        ZipFile: |
+          import boto3
+          from botocore.exceptions import ClientError
+          import json
+          import os
+
+          def lambda_handler(event, context):
+              secret_name = os.environ['AuthSecret']
+              region_name = context.invoked_function_arn.split(":")[3]
+
+              session = boto3.session.Session()
+              client = session.client(
+                  service_name='secretsmanager',
+                  region_name=region_name
+              )
+              try:
+                  get_secret_value_response = client.get_secret_value(
+                      SecretId=secret_name
+                  )
+                  secret_data = get_secret_value_response['SecretString']
+                  secretJson = json.loads(secret_data)
+                  secret_token = secretJson['secret']
+
+                  # Access the authorization token from identitySource
+                  authorization_header = event.get('identitySource', [None])[0]
+
+                  # Check if the authorization header is properly set
+                  if not authorization_header:
+                      return {"isAuthorized": False}
+
+                  # Extract the token from the Bearer scheme
+                  token_parts = authorization_header.split(' ')
+                  if len(token_parts) != 2 or token_parts[0].lower() != 'bearer':
+                      return {"isAuthorized": False}
+
+                  token = token_parts[1]
+
+                  # Check if the provided token matches the secret token
+                  is_authorized = token == secret_token
+
+                  # Construct the response
+                  response = {
+                      "isAuthorized": is_authorized
+                  }
+                  return response
+              except ClientError as e:
+                  print(f"Error retrieving parameter: {e}")
+                  return {
+                      "isAuthorized": False,
+                      "context": {
+                          "error": "Internal server error"
+                      }
+                  }
+
+  AuthorizationLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: AuthorizationLambdaExecutionRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: SecretReadPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource:
+                  - !Sub arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${AuthSecret}-??????
+        - PolicyName: ApiGatewayInvokePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - execute-api:Invoke
+                Resource:
+                  - !Sub arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/*/invoke
+
+#####################################
+# Main Lambda Function 
+# makes requests to Bedrock model
+#####################################
+  MainLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: MainLambdaFunction
+      Description: Make requests to Bedrock models
+      Runtime: python3.12
+      Handler: index.lambda_handler
+      Role: !GetAtt MainLambdaExecutionRole.Arn
+      Timeout: 30
+      MemorySize: 512
+      Environment:
+        Variables:
+          BEDROCK_MODEL_ID: !Ref BedrockModelId
+          BUCKET_NAME: !Ref BucketName
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import os
+          import logging
+          import time
+          from botocore.exceptions import ClientError
+
+          # Initialize logging
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          # Initialize the Bedrock Runtime client
+          bedrock_runtime = boto3.client('bedrock-runtime')
+
+          def lambda_handler(event, context):
+              logger.info('Received event: %s', json.dumps(event))
+
+              try:
+                  # Retrieve the model ID from environment variables
+                  model_id = os.environ['BEDROCK_MODEL_ID']
+
+                  # Validate the input
+                  input_text = event.get("queryStringParameters", {}).get("inputText")
+                  if not input_text:
+                      logger.error('Input text is missing in the request')
+                      raise ValueError("Input text is required in the request query parameters.")
+
+                  # Prepare the payload for invoking the Bedrock model
+                  payload = json.dumps({
+                      "inputText": input_text,
+                      "textGenerationConfig": {
+                          "maxTokenCount": 8192,
+                          "stopSequences": [],
+                          "temperature": 0,
+                          "topP": 1
+                      }
+                  })
+
+                  logger.info('Payload for Bedrock model: %s', payload)
+
+                  # Invoke the Bedrock model
+                  response = bedrock_runtime.invoke_model(
+                      modelId=model_id,
+                      contentType="application/json",
+                      accept="application/json",
+                      body=payload
+                  )
+
+                  logger.info('Response from Bedrock model: %s', response)
+
+                  # Check if the 'body' exists in the response and handle it correctly
+                  if 'body' not in response or not response['body']:
+                      logger.error('Response body is empty')
+                      raise ValueError("Response body is empty.")
+
+                  # Read and process the response
+                  response_body = json.loads(response['body'].read().decode('utf-8'))
+                  logger.info('Processed response body: %s', response_body)
+
+                  fileName = "request-"+str(int(time.time()))+".txt"
+                  fileData = "request :" + payload + "\n" + "response  :"  +json.dumps(response_body)
+                  encoded_string = fileData.encode("utf-8")
+
+                  # Upload the file
+                  s3_client = boto3.client('s3')
+                  bucket_name = os.environ['BUCKET_NAME']
+                  try:
+                    resp = s3_client.put_object(Bucket=bucket_name, Key=fileName, Body=encoded_string)
+                  except ClientError as e:
+                    logging.error(e)
+                  
+
+                  return {
+                      'statusCode': 200,
+                      'body': json.dumps(response_body)
+                  }
+
+              except ClientError as e:
+                  logger.error('ClientError: %s', e)
+                  return {
+                      'statusCode': 500,
+                      'body': json.dumps({"error": "Error interacting with the Bedrock API"})
+                  }
+              except ValueError as e:
+                  logger.error('ValueError: %s', e)
+                  return {
+                      'statusCode': 400,
+                      'body': json.dumps({"error": str(e)})
+                  }
+              except Exception as e:
+                  logger.error('Exception: %s', e)
+                  return {
+                      'statusCode': 500,
+                      'body': json.dumps({"error": "Internal Server Error"})
+                  }
+
+
+  MainLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: MainLambdaExecutionRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: BedrockAccessPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:ListFoundationModels
+                Resource: '*'
+        - PolicyName: BucketPutPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                Resource:
+                  - '*'
+
+
+#####################################
+# API Gateway
+#####################################
+  ApiGateway:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: HttpApi4328
+      ProtocolType: HTTP
+
+  HttpApiGatewayAuthorizer:
+    Type: AWS::ApiGatewayV2::Authorizer
+    Properties:
+      Name: HttpApiGatewayAuthorizer
+      ApiId: !Ref ApiGateway
+      AuthorizerType: REQUEST
+      EnableSimpleResponses: YES
+      AuthorizerUri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthorizationLambdaFunction.Arn}/invocations'
+      AuthorizerResultTtlInSeconds: 0
+      AuthorizerPayloadFormatVersion: '2.0'
+      AuthorizerCredentialsArn: !GetAtt ApiGatewayInvokeLambdaRole.Arn
+      IdentitySource:
+        - "$request.header.Authorization"
+
+  ApiGatewayInvokeLambdaRole:
+    Type: AWS::IAM::Role
+    DependsOn:
+      - AuthorizationLambdaFunction
+      - MainLambdaFunction
+    Properties:
+      RoleName: ApiGatewayInvokeLambdaRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - apigateway.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: AuthorizerPermissionsPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                  - sts:AssumeRole
+                Resource:
+                  - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${AuthorizationLambdaFunction}
+              - Effect: Allow
+                Action:
+                  - execute-api:Invoke
+                Resource:
+                  - !Sub arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/*/invoke
+
+  HttpApiGateway:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref ApiGateway
+      StageName: dev
+      AutoDeploy: true
+
+  HttpApiGatewayRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref ApiGateway
+      RouteKey: ANY /invoke
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref HttpApiGatewayAuthorizer
+      Target: !Join
+        - '/'
+        - - integrations
+          - !Ref HttpApiIntegration
+
+  HttpApiIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref ApiGateway
+      IntegrationType: AWS_PROXY
+      PayloadFormatVersion: '2.0'
+      IntegrationUri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${MainLambdaFunction.Arn}/invocations
+
+  MainLambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt MainLambdaFunction.Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*/*/invoke
