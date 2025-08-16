@@ -4,7 +4,7 @@
 ### Pre requsities
 1. Python3, pip3
 2. aws cli
-
+3. Request model access (Titan Text G1 - Express ) ![Image](images/Request-Model-Access.png)
 
 ### Setup
 1. pip install -r requirements.txt
