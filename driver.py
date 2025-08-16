@@ -6,6 +6,8 @@ import sys
 import time
 import os
 import threading
+from time import sleep
+from tqdm import tqdm
 from botocore.exceptions import ClientError
 
 
@@ -16,8 +18,8 @@ CREATE_OPERATION = 'create'
 DESTROY_OPERATION = 'destroy'
 GET_API_URL = 'getUrl'
 allowedOperations = [CREATE_OPERATION, DESTROY_OPERATION, GET_API_URL]
+
 def printBanner(banner:str):
-    print("printing banner")
 
     # Generate the ASCII art banner
     # You can specify a font using the 'font' argument, e.g., font="slant"
@@ -47,6 +49,9 @@ def handleOperation(operationName:str, response:subprocess.CompletedProcess):
 
 def createSecret():
     #aws secretsmanager create-secret  --name AuthSecret --description SecretValue --secret-string file://secret.json
+
+    session = boto3.session.Session()
+    credentials = session.get_credentials()
     createSecretResponse = subprocess.run(
         [
             "aws",
@@ -57,7 +62,7 @@ def createSecret():
             "--description",
             "SecretValue",
             "--secret-string",
-            "file://secret.json",
+            credentials.secret_key,
         ],
         capture_output=True,
     )
@@ -143,6 +148,44 @@ def createStack():
     )
     handleOperation(operationName='Create Stack',response=createStackResponse)
 
+def getStackStatus():
+    '''
+    aws cloudformation describe-stacks --stack-name apigw-lambda-bedrock
+    '''
+    getStackResponse = subprocess.run(
+        [
+            "aws",
+            "cloudformation",
+            "describe-stacks",
+            "--stack-name",
+            "apigw-lambda-bedrock"
+        ],
+        capture_output=True,
+    )
+    return getStackResponse
+
+
+def monitorStackCreationStatus():
+    currentStackResp = getStackStatus()
+    getSecretResponseJson = json.loads(currentStackResp.stdout.decode("utf-8"))
+    currentStackStatus = getSecretResponseJson['Stacks'][0]["StackStatus"] 
+    print("StackStatus ", currentStackStatus)
+    while currentStackStatus != 'CREATE_COMPLETE':
+        monitorStackCreationStatus()
+    sys.exit()
+
+def monitorStackDestroyStatus():
+    currentStackResp = getStackStatus()
+    if currentStackResp is not None and currentStackResp.stdout is not None and currentStackResp.returncode == 0:
+        getSecretResponseJson = json.loads(currentStackResp.stdout.decode("utf-8"))
+        currentStackStatus = getSecretResponseJson['Stacks'][0]["StackStatus"] 
+        print("StackStatus ", currentStackStatus)
+        while currentStackStatus != 'DELETE_COMPLETE':
+            monitorStackDestroyStatus()
+    sys.exit()
+
+
+
 def destroyStack():
     '''
     aws cloudformation delete-stack --stack-name apigw-lambda-bedrock
@@ -194,21 +237,13 @@ def createBucket():
 
 
 def loadingAnimation(process) :
-    print("Start")
     while process.is_alive() :
         chars = "/—\|" 
         for char in chars:
-            sys.stdout.write('\r'+'loading '+char)
+            sys.stdout.write('\r'+'.. '+char)
             time.sleep(.1)
             sys.stdout.flush()
-    print("\n")
-    print("Finsihed !!")
 
-
-
-def foo():
-    time.sleep(5)
-    return
 
 
 def getApiGateWayEndpoint():
@@ -236,25 +271,31 @@ def getApiGateWayEndpoint():
         print("API gateway url that can be invoked : ",invoke_url)
 
 if __name__ == '__main__':
-    printBanner(banner="Epic Shelter")
+    printBanner(banner="Lynx Lab")
     if validateArgs(sys.argv[1:]):
         operation = sys.argv[1]
         print(f"Performing operation: [{operation}]")
         if operation == CREATE_OPERATION:
             createSecret()
-            # getSecret(secretName="TestSecret99")
             createBucket()
             createStack()
-            # loading_process = threading.Thread(target=foo)
-            # loading_process.start()
-
-            # loadingAnimation(loading_process)
-            # loading_process.join()
-            print("Use operation getUrl  (` python3 epicShelter.py getUrl`) to get the api invocation url")
+            loading_process = threading.Thread(target=monitorStackCreationStatus)
+            loading_process.start()
+            loadingAnimation(loading_process)
+            loading_process.join()
+            print("\n")
+            print("Create operation compeleted !!!")
+            print("Use operation getUrl  (`python3 driver.py getUrl`) to get the api invocation url")
         elif operation == DESTROY_OPERATION:
             deleteSecret()
             deleteBucket()
             destroyStack()
+            loading_process = threading.Thread(target=monitorStackDestroyStatus)
+            loading_process.start()
+            loadingAnimation(loading_process)
+            loading_process.join()
+            print("\n")
+            print("Destroy operation compeleted !!!")
         elif operation == GET_API_URL:
             getApiGateWayEndpoint()
 

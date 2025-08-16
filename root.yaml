@@ -49,9 +49,7 @@ Resources:
                   get_secret_value_response = client.get_secret_value(
                       SecretId=secret_name
                   )
-                  secret_data = get_secret_value_response['SecretString']
-                  secretJson = json.loads(secret_data)
-                  secret_token = secretJson['secret']
+                  secret_token = get_secret_value_response['SecretString']
 
                   # Access the authorization token from identitySource
                   authorization_header = event.get('identitySource', [None])[0]
@@ -214,7 +212,7 @@ Resources:
 
                   return {
                       'statusCode': 200,
-                      'body': json.dumps(response_body)
+                      'body': json.dumps(response_body["results"][0]["outputText"])
                   }
 
               except ClientError as e:
