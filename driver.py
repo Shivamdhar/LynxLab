@@ -23,7 +23,7 @@ def printBanner(banner:str):
 
     # Generate the ASCII art banner
     # You can specify a font using the 'font' argument, e.g., font="slant"
-    ascii_banner = pyfiglet.figlet_format(banner, font="standard")
+    ascii_banner = pyfiglet.figlet_format(banner, font="doh", width=50)
 
     # Print the generated banner
     print(ascii_banner)
@@ -272,6 +272,13 @@ def getApiGateWayEndpoint():
 
 if __name__ == '__main__':
     printBanner(banner="Lynx Lab")
+    print('''
+("`-''-/").___..--''"`-._ 
+ `6_ 6  )   `-.  (     ).`-.__.`) 
+ (_Y_.)'  ._   )  `._ `. ``-..-' 
+   _..`--'_..-_/  /--'_.'
+  ((((.-''  ((((.'  (((.-'
+          ''')
     if validateArgs(sys.argv[1:]):
         operation = sys.argv[1]
         print(f"Performing operation: [{operation}]")
