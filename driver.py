@@ -23,7 +23,7 @@ def printBanner(banner:str):
 
     # Generate the ASCII art banner
     # You can specify a font using the 'font' argument, e.g., font="slant"
-    ascii_banner = pyfiglet.figlet_format(banner, font="doh", width=50)
+    ascii_banner = pyfiglet.figlet_format(banner, font="ghost")
 
     # Print the generated banner
     print(ascii_banner)
@@ -271,7 +271,18 @@ def getApiGateWayEndpoint():
         print("API gateway url that can be invoked : ",invoke_url)
 
 if __name__ == '__main__':
-    printBanner(banner="Lynx Lab")
+    # printBanner(banner="Lynx Lab")
+    print('''
+                            .-') _) (`-.                        ('-.    .-. .-')   
+                           ( OO ) )( OO ).                     ( OO ).-.\  ( OO )  
+ ,--.       ,--.   ,--.,--./ ,--,'(_/.  \_)-.       ,--.       / . --. / ;-----.\  
+ |  |.-')    \  `.'  / |   \ |  |\ \  `.'  /        |  |.-')   | \-.  \  | .-.  |  
+ |  | OO ) .-')     /  |    \|  | ) \     /\        |  | OO ).-'-'  |  | | '-' /_) 
+ |  |`-' |(OO  \   /   |  .     |/   \   \ |        |  |`-' | \| |_.'  | | .-. `.  
+(|  '---.' |   /  /\_  |  |\    |   .'    \_)      (|  '---.'  |  .-.  | | |  \  | 
+ |      |  `-./  /.__) |  | \   |  /  .'.  \        |      |   |  | |  | | '--'  / 
+ `------'    `--'      `--'  `--' '--'   '--'       `------'   `--' `--' `------'                                                                                                                                                                                                                                                           
+    ''')
     print('''
 ("`-''-/").___..--''"`-._ 
  `6_ 6  )   `-.  (     ).`-.__.`) 
