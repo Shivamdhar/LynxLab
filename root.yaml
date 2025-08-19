@@ -7,7 +7,7 @@ Parameters:
     Default: 'AuthSecret'
   BedrockModelId:
     Type: String
-    Default: 'amazon.titan-text-express-v1'
+    Default: 'meta.llama3-8b-instruct-v1:0'
   BucketName:
     Type: String
     Default: 'logs-bucket-test-1'
@@ -161,44 +161,80 @@ Resources:
                   print("In lambda handle !!")
                   # Validate the input
                   input_text = event.get("queryStringParameters", {}).get("inputText")
-                  if not input_text:
-                      logger.error('Input text is missing in the request')
-                      raise ValueError("Input text is required in the request query parameters.")
+                  input_task = event.get("queryStringParameters", {}).get("inputTask")
+                  if not input_text or not input_task:
+                      logger.error('Input text / Input task is missing in the request')
+                      raise ValueError("Input text / Input task is required in the request query parameters.")
 
                   # Prepare the payload for invoking the Bedrock model
-                  payload = json.dumps({
-                      "inputText": input_text,
-                      "textGenerationConfig": {
-                          "maxTokenCount": 8192,
-                          "stopSequences": [],
-                          "temperature": 0,
-                          "topP": 1
+                  # payload = json.dumps({
+                  #     "inputText": input_text,
+                  #     "textGenerationConfig": {
+                  #         "maxTokenCount": 8192,
+                  #         "stopSequences": [],
+                  #         "temperature": 0,
+                  #         "topP": 1
+                  #     }
+                  # })
+                  document_bytes = input_text.encode("utf-8")
+                  payload = [
+                      {
+                          "role": "user",
+                          "content": [
+                              {"text": input_task},
+                              {
+                                  "document": {
+                                      "format": "txt",
+                                      "name": "Sentiment Analysis",
+                                      "source": {"bytes": document_bytes},
+                                  }
+                              },
+                          ],
                       }
-                  })
+                  ]
+
 
                   logger.info('Payload for Bedrock model: %s', payload)
 
                   # Invoke the Bedrock model
-                  response = bedrock_runtime.invoke_model(
+                  # response = bedrock_runtime.invoke_model(
+                  #     modelId=model_id,
+                  #     contentType="application/json",
+                  #     accept="application/json",
+                  #     body=payload
+                  # )
+
+                  response = bedrock_runtime.converse(
                       modelId=model_id,
-                      contentType="application/json",
-                      accept="application/json",
-                      body=payload
+                      messages=payload,
+                      inferenceConfig={"maxTokens": 600, "temperature": 0.3},
                   )
+
 
                   logger.info('Response from Bedrock model: %s', response)
 
+                  # # Check if the 'body' exists in the response and handle it correctly
+                  # if 'body' not in response or not response['body']:
+                  #     logger.error('Response body is empty')
+                  #     raise ValueError("Response body is empty.")
+
+                  # # Read and process the response
+                  # response_body = json.loads(response['body'].read().decode('utf-8'))
+                  # logger.info('Processed response body: %s', response_body)
+
+
                   # Check if the 'body' exists in the response and handle it correctly
-                  if 'body' not in response or not response['body']:
-                      logger.error('Response body is empty')
-                      raise ValueError("Response body is empty.")
+                  if 'output' not in response or not response['output']:
+                      logger.error('Response output is empty')
+                      raise ValueError("Response output is empty.")
 
                   # Read and process the response
-                  response_body = json.loads(response['body'].read().decode('utf-8'))
+                  response_body = response['output']
+                  print(type(response_body))
                   logger.info('Processed response body: %s', response_body)
 
                   fileName = "request-"+str(int(time.time()))+".txt"
-                  fileData = "request :" + payload + "\n" + "response  :"  +json.dumps(response_body)
+                  fileData = "request :" + str(payload) + "\n" + "response  :"  +json.dumps(response_body)
                   encoded_string = fileData.encode("utf-8")
 
                   # Upload the file
@@ -210,9 +246,11 @@ Resources:
                     logging.error(e)
                   
 
+                  rawResponse = json.dumps(response_body["message"]["content"][0]["text"])
+                  rawResponse = rawResponse.replace('\n\n','')
                   return {
                       'statusCode': 200,
-                      'body': json.dumps(response_body["results"][0]["outputText"])
+                      'body': rawResponse
                   }
 
               except ClientError as e:

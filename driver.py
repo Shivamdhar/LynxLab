@@ -12,12 +12,13 @@ from botocore.exceptions import ClientError
 
 
 # Usage: python3 epicShelter.py [OPERATION] 
-# [OPERATION] - create/destroy
+# [OPERATION] - create/destroy/update
 
 CREATE_OPERATION = 'create'
 DESTROY_OPERATION = 'destroy'
+UPDATE_OPERATION = 'update'
 GET_API_URL = 'getUrl'
-allowedOperations = [CREATE_OPERATION, DESTROY_OPERATION, GET_API_URL]
+allowedOperations = [CREATE_OPERATION, DESTROY_OPERATION, GET_API_URL, UPDATE_OPERATION]
 
 def printBanner(banner:str):
 
@@ -148,6 +149,33 @@ def createStack():
     )
     handleOperation(operationName='Create Stack',response=createStackResponse)
 
+
+def updateStack():
+    print("Update cloudFormation stack !!!")
+    '''
+    aws cloudformation create-stack \
+    --stack-name apigw-lambda-bedrock \
+    --template-body file://infrastructure/root.yaml \
+    --capabilities CAPABILITY_NAMED_IAM \
+    --disable-rollback
+    '''
+    updateStackResponse = subprocess.run(
+        [
+            "aws",
+            "cloudformation",
+            "update-stack",
+            "--stack-name",
+            "apigw-lambda-bedrock",
+            "--template-body",
+            "file://root.yaml",
+            "--capabilities",
+            "CAPABILITY_NAMED_IAM",
+            "--disable-rollback"
+        ],
+        capture_output=True,
+    )
+    handleOperation(operationName='Update Stack',response=updateStackResponse)
+
 def getStackStatus():
     '''
     aws cloudformation describe-stacks --stack-name apigw-lambda-bedrock
@@ -172,6 +200,16 @@ def monitorStackCreationStatus():
     print("StackStatus ", currentStackStatus)
     while currentStackStatus != 'CREATE_COMPLETE':
         monitorStackCreationStatus()
+    sys.exit()
+
+
+def monitorStackUpdationStatus():
+    currentStackResp = getStackStatus()
+    getSecretResponseJson = json.loads(currentStackResp.stdout.decode("utf-8"))
+    currentStackStatus = getSecretResponseJson['Stacks'][0]["StackStatus"] 
+    print("StackStatus ", currentStackStatus)
+    while currentStackStatus != 'UPDATE_COMPLETE':
+        monitorStackUpdationStatus()
     sys.exit()
 
 def monitorStackDestroyStatus():
@@ -316,4 +354,13 @@ if __name__ == '__main__':
             print("Destroy operation compeleted !!!")
         elif operation == GET_API_URL:
             getApiGateWayEndpoint()
+        elif operation == UPDATE_OPERATION:
+            updateStack()
+            loading_process = threading.Thread(target=monitorStackUpdationStatus)
+            loading_process.start()
+            loadingAnimation(loading_process)
+            loading_process.join()
+            print("\n")
+            print("Update operation compeleted !!!")
+
 
