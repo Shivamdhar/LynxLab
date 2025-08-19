@@ -4,10 +4,7 @@ import json
 import boto3
 import sys
 import time
-import os
 import threading
-from time import sleep
-from tqdm import tqdm
 from botocore.exceptions import ClientError
 
 
