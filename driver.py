@@ -1,14 +1,13 @@
 import pyfiglet
-import subprocess
-import json
 import boto3
+import json
+import subprocess
 import sys
-import time
 import threading
+import time
+
 from botocore.exceptions import ClientError
-
-
-# Usage: python3 epicShelter.py [OPERATION] 
+ 
 # [OPERATION] - create/destroy/update
 
 CREATE_OPERATION = 'create'
@@ -300,10 +299,10 @@ def getApiGateWayEndpoint():
     )
     gateWayUrl = getApiGwEndpointResponse.stdout.removesuffix("\n")
     if gateWayUrl == '':
-        print("Stack creation is still in progress , please execute the command after few seconds")
+        print("Stack creation is still in progress, please execute the command after few seconds")
     else:
         invoke_url=gateWayUrl + "/" + stage_name
-        print("API gateway url that can be invoked : ",invoke_url)
+        print("API gateway URL that can be invoked: ",invoke_url)
 
 if __name__ == '__main__':
     # printBanner(banner="Lynx Lab")
@@ -318,13 +317,6 @@ if __name__ == '__main__':
  |      |  `-./  /.__) |  | \   |  /  .'.  \        |      |   |  | |  | | '--'  / 
  `------'    `--'      `--'  `--' '--'   '--'       `------'   `--' `--' `------'                                                                                                                                                                                                                                                           
     ''')
-    print('''
-("`-''-/").___..--''"`-._ 
- `6_ 6  )   `-.  (     ).`-.__.`) 
- (_Y_.)'  ._   )  `._ `. ``-..-' 
-   _..`--'_..-_/  /--'_.'
-  ((((.-''  ((((.'  (((.-'
-          ''')
     if validateArgs(sys.argv[1:]):
         operation = sys.argv[1]
         print(f"Performing operation: [{operation}]")
@@ -337,8 +329,8 @@ if __name__ == '__main__':
             loadingAnimation(loading_process)
             loading_process.join()
             print("\n")
-            print("Create operation compeleted !!!")
-            print("Use operation getUrl  (`python3 driver.py getUrl`) to get the api invocation url")
+            print("Create operation compeleted!")
+            print("Use operation getUrl (`python3 driver.py getUrl`) to get the api invocation URL")
         elif operation == DESTROY_OPERATION:
             deleteSecret()
             deleteBucket()
@@ -348,7 +340,7 @@ if __name__ == '__main__':
             loadingAnimation(loading_process)
             loading_process.join()
             print("\n")
-            print("Destroy operation compeleted !!!")
+            print("Destroy operation compeleted!")
         elif operation == GET_API_URL:
             getApiGateWayEndpoint()
         elif operation == UPDATE_OPERATION:
@@ -358,6 +350,6 @@ if __name__ == '__main__':
             loadingAnimation(loading_process)
             loading_process.join()
             print("\n")
-            print("Update operation compeleted !!!")
+            print("Update operation compeleted!")
 
 
