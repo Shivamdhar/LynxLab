@@ -41,9 +41,11 @@ Step 5: To get the invocation URL for the API gateway, run the command
 `python3 driver.py getUrl`
 
 
-Step 6: Use the URL returned above to pass in the input for sentiment analysis.
+Step 6: Use the URL returned above to pass in the input for sentiment analysis via curl cli or use Postman for API invocation.
 
-`curl -s -X GET -H "Authorization: Bearer $APIGW_TOKEN" "<replace by returned URL>/dev/invoke?inputText=Gill%20%2C%20Rahul%20and%20Jaiswal%20got%20out%20for%200%20runs%20in%20cricket%20match%20against%20Australia&inputTask=Perform%20the%20sentiment%20analysis"`
+```
+curl -s -X GET -H "Authorization: Bearer $APIGW_TOKEN" "<replace by returned URL>/dev/invoke?inputText=Gill%20%2C%20Rahul%20and%20Jaiswal%20got%20out%20for%200%20runs%20in%20cricket%20match%20against%20Australia&inputTask=Perform%20the%20sentiment%20analysis"
+```
 
 
 Step 7: Finally to destroy the Lynxlab stack, run the command
