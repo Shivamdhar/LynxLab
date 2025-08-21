@@ -8,4 +8,4 @@ Step 2: Select **Model access** from the left navigation menu.
 
 Step 3: Search for **Llama 3 8B Instruct** and request the model access.
 
-![Image](images/request-model-access.png)
+![Image](images/Request-Model-Access.png)
