@@ -16,7 +16,7 @@ LynxLab is a cloud lab setup utility that streamlines the deployment of an AI-dr
 ### :computer: Setup
 Step 1: Start by pulling all the dependencies required for the project
 
-`pip install -r requirements.txt`
+`pip3 install -r requirements.txt`
 
 Step 2: Configure settings for the AWS CLI by creating a file `~/.aws/config` with contents as
 
