@@ -96,9 +96,17 @@ Resources:
                 - lambda.amazonaws.com
             Action:
               - sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
       Policies:
+        - PolicyName: CloudWatchLogPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow # Change this to Deny in order to skip logging into cloudWatch
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
         - PolicyName: SecretReadPolicy
           PolicyDocument:
             Version: '2012-10-17'
