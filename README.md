@@ -2,6 +2,9 @@
 
 LynxLab is a cloud lab setup utility that streamlines the deployment of an AI-driven pipeline, illustrated through a sentiment analysis use case. Beyond AI experimentation, it enables security practitioners to simulate attacks and evaluate defense strategies for serverless components in the cloud.
 
+To try out some attack simulation and defense scenarios, follow the instructions [here](README-scenarios.md).
+
+
 ### :rocket: Design
 
 ![Image](images/serverless-setup.png)

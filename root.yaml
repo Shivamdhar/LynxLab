@@ -101,7 +101,7 @@ Resources:
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
-              - Effect: Allow # Change this to Deny in order to skip logging into cloudWatch
+              - Effect: Allow # Change this to Deny in order to skip logging into CloudWatch
                 Action:
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
