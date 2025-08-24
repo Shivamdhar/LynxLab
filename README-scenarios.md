@@ -1,12 +1,12 @@
 # Scenarios
 
-### :heavy_exclamation_mark: Platform misconfigurations
+## :heavy_exclamation_mark: Platform misconfigurations
 
-Risk
+### Risk
 - Failed forensics
 - Resource exhaustion
 
-Simulation
+### Simulation
 
 The current LynxLab stack enables logging of any event triggered within the authorizer Lambda function, based on the policy configured in `AuthorizationLambdaExecutionRole` in [root.yaml](root.yaml?plain=1#L104).
 
