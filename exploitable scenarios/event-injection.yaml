@@ -1,0 +1,148 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Scenario 2 - API Gateway insecure vs secure endpoints (AWS-native request validation).
+Resources:
+  Api: { Type: AWS::ApiGateway::RestApi, Properties: { Name: lab-event-injection-api } }
+
+  InsecureRes:
+    Type: AWS::ApiGateway::Resource
+    Properties: { RestApiId: !Ref Api, ParentId: !GetAtt Api.RootResourceId, PathPart: insecure }
+  InsecureTransfers:
+    Type: AWS::ApiGateway::Resource
+    Properties: { RestApiId: !Ref Api, ParentId: !Ref InsecureRes, PathPart: transfers }
+
+  SecureRes:
+    Type: AWS::ApiGateway::Resource
+    Properties: { RestApiId: !Ref Api, ParentId: !GetAtt Api.RootResourceId, PathPart: secure }
+  SecureTransfers:
+    Type: AWS::ApiGateway::Resource
+    Properties: { RestApiId: !Ref Api, ParentId: !Ref SecureRes, PathPart: transfers }
+
+  Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement: [{ Effect: Allow, Principal: { Service: lambda.amazonaws.com }, Action: sts:AssumeRole }]
+      ManagedPolicyArns: [ arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole ]
+
+  InsecureFn:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: lab-insecure-api-cfn
+      Runtime: python3.11
+      Handler: insecure.handler
+      Role: !GetAtt Role.Arn
+      Code:
+        ZipFile: |
+          import json
+          def handler(event, context):
+              body = event.get("body")
+              try:
+                  data = json.loads(body) if isinstance(body, str) else (body or {})
+              except Exception:
+                  data = {}
+              note = "Elevated path taken (simulation)" if data.get("role") == "admin" else "Normal path."
+              return { "statusCode": 200, "headers": {"Content-Type":"application/json"},
+                       "body": json.dumps({"ok": True, "note": note, "echo": data}) }
+
+  SecureFn:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: lab-secure-api-cfn
+      Runtime: python3.11
+      Handler: secure.handler
+      Role: !GetAtt Role.Arn
+      Code:
+        ZipFile: |
+          import json
+          def handler(event, context):
+              headers = { (k or '').lower(): v for k,v in (event.get("headers") or {}).items() }
+              if "application/json" not in headers.get("content-type",""):
+                  return {"statusCode": 415, "body": "Unsupported Media Type"}
+              try:
+                  data = json.loads(event.get("body") or "{}")
+              except Exception:
+                  return {"statusCode": 400, "body": json.dumps({"error":"invalid JSON"})}
+              allowed = {"account_id","amount_cents","memo"}
+              if not set(data.keys()).issubset(allowed):
+                  return {"statusCode": 400, "body": json.dumps({"error":"unknown fields"})}
+              if not isinstance(data.get("account_id",""), str) or not isinstance(data.get("amount_cents",0), int):
+                  return {"statusCode": 400, "body": json.dumps({"error":"type mismatch"})}
+              return {"statusCode": 200, "headers":{"Content-Type":"application/json"},
+                      "body": json.dumps({"ok": True, **{k:data.get(k) for k in allowed}})}
+
+  TransferModel:
+    Type: AWS::ApiGateway::Model
+    Properties:
+      RestApiId: !Ref Api
+      Name: TransferReq
+      ContentType: application/json
+      Schema:
+        type: object
+        additionalProperties: false
+        properties:
+          account_id: { type: string, minLength: 3, maxLength: 64 }
+          amount_cents: { type: integer, minimum: 0, maximum: 10000000 }
+          memo: { type: [ "string", "null" ] }
+        required: [ account_id, amount_cents ]
+
+  BodyValidator:
+    Type: AWS::ApiGateway::RequestValidator
+    Properties:
+      RestApiId: !Ref Api
+      Name: ValidateBody
+      ValidateRequestBody: true
+      ValidateRequestParameters: false
+
+  InsecurePost:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref Api
+      ResourceId: !Ref InsecureTransfers
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${InsecureFn.Arn}/invocations
+
+  SecurePost:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref Api
+      ResourceId: !Ref SecureTransfers
+      HttpMethod: POST
+      AuthorizationType: NONE
+      RequestModels: { application/json: !Ref TransferModel }
+      RequestValidatorId: !Ref BodyValidator
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SecureFn.Arn}/invocations
+
+  AllowInsecureInvoke:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref InsecureFn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${Api}/*/*/*
+  AllowSecureInvoke:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref SecureFn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${Api}/*/*/*
+
+  Deploy:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: [ InsecurePost, SecurePost ]
+    Properties: { RestApiId: !Ref Api, Description: initial }
+  Stage:
+    Type: AWS::ApiGateway::Stage
+    Properties: { RestApiId: !Ref Api, DeploymentId: !Ref Deploy, StageName: dev }
+
+Outputs:
+  InsecureInvokeURL: { Value: !Sub https://${Api}.execute-api.${AWS::Region}.amazonaws.com/dev/insecure/transfers }
+  SecureInvokeURL:   { Value: !Sub https://${Api}.execute-api.${AWS::Region}.amazonaws.com/dev/secure/transfers }
