@@ -7,7 +7,7 @@ Parameters:
     Default: 'AuthSecret'
   BedrockModelId:
     Type: String
-    Default: 'meta.llama3-8b-instruct-v1:0'
+    Default: 'us.amazon.nova-micro-v1:0'
   BucketName:
     Type: String
     Default: 'logs-bucket-test-1'
@@ -184,23 +184,14 @@ Resources:
                   #         "topP": 1
                   #     }
                   # })
-                  document_bytes = input_text.encode("utf-8")
+                  combined_prompt = f"Task: {input_task}\n\nContent to analyze: {input_text}"
+        
                   payload = [
                       {
                           "role": "user",
-                          "content": [
-                              {"text": input_task},
-                              {
-                                  "document": {
-                                      "format": "txt",
-                                      "name": "Sentiment Analysis",
-                                      "source": {"bytes": document_bytes},
-                                  }
-                              },
-                          ],
+                          "content": [{"text": combined_prompt}]
                       }
                   ]
-
 
                   logger.info('Payload for Bedrock model: %s', payload)
 
@@ -213,9 +204,13 @@ Resources:
                   # )
 
                   response = bedrock_runtime.converse(
-                      modelId=model_id,
-                      messages=payload,
-                      inferenceConfig={"maxTokens": 600, "temperature": 0.3},
+                  modelId=model_id,
+                  messages=payload,
+                  inferenceConfig={
+                      "maxTokens": 600, 
+                      "temperature": 0.3,
+                      "topP": 0.9
+                  },
                   )
 
 
@@ -240,21 +235,26 @@ Resources:
                   response_body = response['output']
                   print(type(response_body))
                   logger.info('Processed response body: %s', response_body)
+                  response_message = response['output']['message']
+                  response_text = response_message['content'][0]['text']
 
                   fileName = "request-"+str(int(time.time()))+".txt"
-                  fileData = "request :" + str(payload) + "\n" + "response  :"  +json.dumps(response_body)
-                  encoded_string = fileData.encode("utf-8")
+                  log_content = {
+                      "request_payload": payload,
+                      "response_output": response_text,
+                      "model_used": model_id
+                  }
 
                   # Upload the file
                   s3_client = boto3.client('s3')
                   bucket_name = os.environ['BUCKET_NAME']
                   try:
-                    resp = s3_client.put_object(Bucket=bucket_name, Key=fileName, Body=encoded_string)
+                    resp = s3_client.put_object(Bucket=bucket_name, Key=fileName, Body=json.dumps(log_content).encode("utf-8"))
                   except ClientError as e:
                     logging.error(e)
                   
 
-                  rawResponse = json.dumps(response_body["message"]["content"][0]["text"])
+                  rawResponse = json.dumps({"analysis": response_text.strip()})
                   rawResponse = rawResponse.replace('\n\n','')
                   return {
                       'statusCode': 200,
