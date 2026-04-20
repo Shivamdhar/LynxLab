@@ -1,0 +1,34 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Scenario 3 - Lambda with intentionally outdated dependency layer.
+Parameters:
+  LayerBucket: { Type: String }
+  LayerKey:    { Type: String }
+Resources:
+  Layer:
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      LayerName: vuln-python-deps-layer
+      Content: { S3Bucket: !Ref LayerBucket, S3Key: !Ref LayerKey }
+      CompatibleRuntimes: [ python3.11 ]
+  Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement: [{ Effect: Allow, Principal: { Service: lambda.amazonaws.com }, Action: sts:AssumeRole }]
+      ManagedPolicyArns: [ arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole ]
+  Fn:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: lab-vuln-deps-demo-cfn
+      Runtime: python3.11
+      Handler: app.handler
+      Role: !GetAtt Role.Arn
+      Layers: [ !Ref Layer ]
+      Code:
+        ZipFile: |
+          import yaml, requests  # ensure packages load at init
+          def handler(event, context):
+              return {"ok": True, "msg": "Inspector should scan this package set."}
+Outputs:
+  FunctionName: { Value: !Ref Fn }
