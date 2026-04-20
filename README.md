@@ -60,7 +60,7 @@ Step 7: Finally to destroy the Lynxlab stack, run the command
 ### FAQ's
 1. Common issues encountered while running the setup
     a. Case : An unexpected AWS error occurred: b'\nAn error occurred (BucketAlreadyExists) when calling the CreateBucket operation: The requested bucket name is not available. The bucket namespace is shared by all users of the system. Please select a different name and try again.\n'
-       Solution : Replace the bucket name in the driver.py from logs-bucket-test-1 to logs-bucket-test-1-<any-random-name>, example : logs-bucket-test-1-mike-ross
+       Solution : Replace the BUCKET_NAME name in the driver.py and BucketName in the root.yaml files from logs-bucket-test-1 to logs-bucket-test-1-<any-random-name>, example : logs-bucket-test-1-mike-ross
     b. Case : An unexpected AWS error occurred: b'\nAn error occurred (ResourceExistsException) when calling the CreateSecret operation: The operation failed because the secret AuthSecret already exists.\n'
        Solution : Run destroy command : python3 driver.py destroy . Post that you can start creating the stack freshly !
 2. If you are using any region other than us , make sure to change the prefix in the root.yaml line number 10 where model is specified (ex: amazon.nova-micro-v1:0 currently this activity was tried out in us region and hence the prefix us)
