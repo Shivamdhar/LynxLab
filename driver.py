@@ -14,6 +14,7 @@ CREATE_OPERATION = 'create'
 DESTROY_OPERATION = 'destroy'
 UPDATE_OPERATION = 'update'
 GET_API_URL = 'getUrl'
+BUCKET_NAME = 'logs-bucket-test-1'
 allowedOperations = [CREATE_OPERATION, DESTROY_OPERATION, GET_API_URL, UPDATE_OPERATION]
 
 def printBanner(banner:str):
@@ -246,7 +247,7 @@ def deleteBucket():
             "aws",
             "s3",
             "rb",
-            "s3://logs-bucket-test-1",
+            "s3://"+BUCKET_NAME+"",
             "--force"
         ],
         capture_output=True,
@@ -255,7 +256,7 @@ def deleteBucket():
 
 def createBucket():
     '''
-    aws s3api create-bucket --bucket logs-bucket-test-1
+    aws s3api create-bucket --bucket BUCKET_NAME
     '''
     createBucketResponse = subprocess.run(
         [
@@ -263,7 +264,7 @@ def createBucket():
             "s3api",
             "create-bucket",
             "--bucket",
-            "logs-bucket-test-1"
+            BUCKET_NAME
         ],
         capture_output=True,
     )
