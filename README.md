@@ -9,12 +9,15 @@ To try out some attack simulation and defense scenarios, follow the instructions
 
 ![Image](images/serverless-setup.png)
 
+---
+
 ### :pencil: Prerequisites
 1. python3, pip3 (a. Command to install pip : python3 -m venv venv   b. source venv/bin/activate)
 2. Postman for API invocation
-3. A free tier AWS account - https://aws.amazon.com/free/
+3. A free-tier AWS account - https://aws.amazon.com/free/
 4. AWS CLI to access the AWS account - https://aws.amazon.com/cli/
-5. Request model access for **Llama 3 8B Instruct** as per the instructions [here](README-model-access.md).
+
+---
 
 ### :computer: Setup
 Step 1: Start by pulling all the dependencies required for the project
@@ -55,19 +58,23 @@ Step 7: Finally to destroy the Lynxlab stack, run the command
 
 `python3 driver.py destroy`
 
+---
 
-
-### FAQ's
+### FAQs
 1. Common issues encountered while running the setup
 
-    a. Case : An unexpected AWS error occurred:
-   ```b'\nAn error occurred (BucketAlreadyExists) when calling the CreateBucket operation: The requested bucket name is not available. The bucket namespace is shared by all users of the system. Please select a different name and try again.\n'```
+    a. **Case** : An unexpected AWS error occurred:
+   ```
+   b'\nAn error occurred (BucketAlreadyExists) when calling the CreateBucket operation: The requested bucket name is not available. The bucket namespace is shared by all users of the system. Please select a different name and try again.\n'
+   ```
 
-   Solution : Replace the `BUCKET_NAME` name in the `driver.py` and `BucketName` in the `root.yaml` files from `logs-bucket-test-1` to `logs-bucket-test-1-<any-random-name>`, example : `logs-bucket-test-1-mike-ross`
+   **Solution** : Replace the `BUCKET_NAME` name in the `driver.py` and `BucketName` in the `root.yaml` files from `logs-bucket-test-1` to `logs-bucket-test-1-<any-random-name>`, example : `logs-bucket-test-1-mike-ross`
 
-   b. Case : An unexpected AWS error occurred:
-   ```b'\nAn error occurred (ResourceExistsException) when calling the CreateSecret operation: The operation failed because the secret AuthSecret already exists.\n'```
+   b. **Case** : An unexpected AWS error occurred:
+   ```
+   b'\nAn error occurred (ResourceExistsException) when calling the CreateSecret operation: The operation failed because the secret AuthSecret already exists.\n'
+   ```
 
-   Solution : Run destroy command : `python3 driver.py destroy`. Post that, you can create a fresh stack!
+   **Solution** : Run command : `python3 driver.py destroy`. Post that, you can create a fresh stack!
 
 2. If you are using any region other than US, make sure to change the prefix in the `root.yaml` line number 10 where the model is specified (ex:`amazon.nova-micro-v1:0` as this activity was tried out in US region and hence the prefix US)
