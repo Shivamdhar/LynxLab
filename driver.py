@@ -106,6 +106,8 @@ def getSecret(secretName:str):
     # print(getSecretResponseJson)
 
 
+
+#aws secretsmanager delete-secret --secret-id AuthSecret --force-delete-without-recovery
 def deleteSecret():
     deleteSecretResponse = subprocess.run(
         [
