@@ -20,6 +20,11 @@ To try out some attack simulation and defense scenarios, follow the instructions
 ---
 
 ### :computer: Setup
+
+> **Two deployment options are available:**
+> - **CloudFormation** (steps below) — uses `driver.py` to manage the stack
+> - **Terraform** — see the [Terraform deployment guide](terraform/README.md) for full instructions
+
 Step 1: Start by pulling all the dependencies required for the project
 
 `pip3 install -r requirements.txt`
