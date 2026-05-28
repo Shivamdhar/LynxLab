@@ -4,6 +4,8 @@ LynxLab is a cloud lab setup utility that streamlines the deployment of an AI-dr
 
 > **What is Terraform?** Terraform is an Infrastructure as Code (IaC) tool that lets you define and provision cloud resources using configuration files instead of clicking through a console. Running `terraform apply` creates everything you need in one shot; `terraform destroy` tears it all down cleanly.
 
+To try out some attack simulation and defense scenarios, follow the instructions [here](README-scenarios.md).
+
 ---
 
 ## :building_construction: What Gets Deployed
