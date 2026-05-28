@@ -40,7 +40,10 @@ Main Lambda
 
 ## :pencil: Prerequisites
 
-### 1. Terraform
+### 1. AWS Account
+A free-tier AWS account — https://aws.amazon.com/free/
+
+### 2. Terraform
 Any latest stable version above 1.0 works. Install via Homebrew (macOS):
 ```bash
 brew tap hashicorp/tap
@@ -53,7 +56,8 @@ Verify your installation:
 terraform -version
 ```
 
-### 2. AWS CLI — configured with credentials
+### 3. AWS CLI — configured with credentials
+Download: https://aws.amazon.com/cli/
 ```bash
 aws configure
 ```
@@ -63,14 +67,22 @@ You'll be prompted for:
 - `Default region` (e.g. `us-east-1`)
 - `Default output format` (e.g. `json`)
 
-### 3. AWS Bedrock model access
+Alternatively, create the file `~/.aws/config` manually with the following contents:
+```
+[default]
+region = <your-region>
+aws_access_key_id = <your-access-key-id>
+aws_secret_access_key = <your-secret-access-key>
+```
+
+### 4. AWS Bedrock model access
 The main Lambda calls Amazon Bedrock. You need to enable model access in your AWS account before deploying.
 
 Follow the steps in [README-model-access.md](README-model-access.md) to request access to the model used (default: `us.amazon.nova-micro-v1:0`).
 
 > If you are **not** in a US region, change the `bedrock_model_id` variable to the correct regional model ID, for example `amazon.nova-micro-v1:0` (without the `us.` prefix).
 
-### 4. Set your API token environment variable
+### 5. Set your API token environment variable
 Before deploying, decide on a token that will be used to authenticate all API requests. This token is stored in AWS Secrets Manager and checked by the Authorizer Lambda on every call.
 
 ```bash
