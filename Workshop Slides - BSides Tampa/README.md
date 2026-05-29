@@ -1,5 +1,5 @@
 html<details>
-  <summary>Click to view Screenshots</summary>
+  <summary>Click to view slides</summary>
   <img src="Slide 1 - Title.png">
   <img src="Slide 2 - Problem Statement.png">
   <img src="Slide 3 - LynxLab.png">
