@@ -1,8 +1,6 @@
-# LynxLab — Terraform Deployment Guide
+# LynxLab — Deployment Guide
 
 LynxLab is a cloud lab setup utility that streamlines the deployment of an AI-driven pipeline, illustrated through a sentiment analysis use case. Beyond AI experimentation, it enables security practitioners to simulate attacks and evaluate defense strategies for serverless components in the cloud.
-
-> **What is Terraform?** Terraform is an Infrastructure as Code (IaC) tool that lets you define and provision cloud resources using configuration files instead of clicking through a console. Running `terraform apply` creates everything you need in one shot; `terraform destroy` tears it all down cleanly.
 
 To try out some attack simulation and defense scenarios, follow the instructions [here](README-scenarios.md).
 
@@ -46,6 +44,9 @@ Main Lambda
 A free-tier AWS account — https://aws.amazon.com/free/
 
 ### 2. Terraform
+
+> **What is Terraform?** Terraform is an Infrastructure as Code (IaC) tool that lets you define and provision cloud resources using configuration files instead of clicking through a console. Running `terraform apply` creates everything you need in one shot; `terraform destroy` tears it all down cleanly.
+
 Any latest stable version above 1.0 works. Install via Homebrew (macOS):
 ```bash
 brew tap hashicorp/tap
